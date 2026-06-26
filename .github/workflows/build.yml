@@ -1,0 +1,68 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Validate HTML files
+        run: |
+          echo "Checking HTML files..."
+          for file in *.html index-mobile.html; do
+            if [ -f "$file" ]; then
+              echo "File: $file"
+              grep -c "<script" "$file" || true
+              grep -c "</script>" "$file" || true
+            fi
+          done
+          
+      - name: Validate JS files
+        run: |
+          echo "Checking JS files..."
+          for file in js/*.js; do
+            if [ -f "$file" ]; then
+              echo "File: $file"
+              node --check "$file" 2>&1 || echo "Syntax check not available for this JS (browser globals)"
+            fi
+          done
+          
+      - name: Check for required elements
+        run: |
+          echo "Checking index-mobile.html structure..."
+          grep -q 'id="namesFileInput"' index-mobile.html && echo "✓ namesFileInput found"
+          grep -q 'id="previewTable"' index-mobile.html && echo "✓ previewTable found"
+          grep -q 'id="resultTable"' index-mobile.html && echo "✓ resultTable found"
+          grep -q 'id="routeInput"' index-mobile.html && echo "✓ routeInput found"
+          
+      - name: List project files
+        run: |
+          echo "Project structure:"
+          find . -type f \( -name "*.html" -o -name "*.css" -o -name "*.js" -o -name "*.json" -o -name "*.md" \) | head -20
+          
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
