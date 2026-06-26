@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Геокодер</title>
+    <link rel="stylesheet" href="css/mobile.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Геокодер</h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('load')">1 Загрузка</button>
+            <button class="tab-btn" onclick="showTab('check')">2 Проверка</button>
+            <button class="tab-btn" onclick="showTab('result')">3 Результат</button>
+            <button class="tab-btn" onclick="showTab('route')">4 Маршрут</button>
+        </div>
+        
+        <div class="card tab-content" id="tab-load">
+            <h3>Загрузка адресов</h3>
+            <div class="form-group">
+                <label>Выберите файл:</label>
+                <input type="file" id="namesFileInput" accept=".txt,.xlsx,.csv">
+            </div>
+            <div id="namesFileInfo" class="file-info"></div>
+            
+            <details class="base-details">
+                <summary>База (необязательно)</summary>
+                <div class="base-section">
+                    <div class="form-group">
+                        <label>Адрес базы:</label>
+                        <input type="text" id="baseAddress" placeholder="Адрес базы">
+                    </div>
+                    <div class="coords-row">
+                        <div class="form-group">
+                            <label>lat:</label>
+                            <input type="number" id="baseLat" step="0.000001" placeholder="lat">
+                        </div>
+                        <div class="form-group">
+                            <label>lon:</label>
+                            <input type="number" id="baseLon" step="0.000001" placeholder="lon">
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary full-width" onclick="fillBaseCoords()">Найти координаты базы</button>
+                </div>
+            </details>
+            
+            <button class="btn btn-primary full-width btn-large" onclick="goToCheck()">Далее</button>
+        </div>
+        
+        <div class="card tab-content" id="tab-check" style="display:none">
+            <h3>Проверка</h3>
+            <div class="file-info">
+                Загружено: <span id="countAll">0</span> адресов
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Адрес</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewTable"></tbody>
+                </table>
+            </div>
+            
+            <button class="btn btn-primary full-width btn-large" onclick="startGeocoding()">Найти координаты</button>
+        </div>
+        
+        <div class="card tab-content" id="tab-result" style="display:none">
+            <h3>Результат</h3>
+            <div class="progress">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            <div class="stats-mobile">
+                <span class="stat"><span id="totalCount">0</span> всего</span>
+                <span class="stat stat-success"><span id="foundCount">0</span> найдено</span>
+                <span class="stat stat-danger"><span id="notFoundCount">0</span> нет</span>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Адрес</th>
+                            <th>km</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTable"></tbody>
+                </table>
+            </div>
+            
+            <div class="btn-group-vertical">
+                <button class="btn btn-success full-width btn-large" onclick="downloadResults()">Сохранить в Excel</button>
+                <button class="btn btn-secondary full-width" onclick="downloadDistanceMatrix()">Матрица расстояний</button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopGeocoding()" disabled>Остановить</button>
+            </div>
+        </div>
+        
+        <div class="card tab-content" id="tab-route" style="display:none">
+            <h3>Маршрут</h3>
+            
+            <div class="form-group">
+                <label>Загрузить матрицу (.xlsx):</label>
+                <input type="file" id="matrixFileInput" accept=".xlsx" onchange="loadCustomMatrix(this)">
+            </div>
+            <div id="customMatrixInfo" class="file-info"></div>
+            
+            <div class="form-group">
+                <label>Быстрый поиск:</label>
+                <div class="autocomplete-wrapper">
+                    <input type="text" id="quickSearch" placeholder="Введите название..." oninput="handleQuickSearch(this.value)">
+                    <div id="autocompleteList" class="autocomplete-list"></div>
+                </div>
+            </div>
+            <button class="btn btn-secondary full-width" onclick="addToRoute()">Добавить в маршрут</button>
+            
+            <div class="form-group">
+                <label>Маршрут:</label>
+                <textarea id="routeInput" placeholder="Название 1
+Название 2
+Название 3"></textarea>
+            </div>
+            
+            <div class="btn-group-vertical">
+                <button class="btn btn-primary full-width btn-large" onclick="calculateRoute()">Рассчитать</button>
+                <button class="btn btn-secondary" onclick="clearRoute()">Очистить</button>
+            </div>
+            
+            <div id="routeResult"></div>
+        </div>
+        
+        <div class="card instructions">
+            <h3>Как пользоваться</h3>
+            <p><b>1.</b> Загрузите файл с адресами</p>
+            <p><b>2.</b> Проверьте очищенные адреса</p>
+            <p><b>3.</b> Дождитесь поиска координат</p>
+            <p><b>4.</b> Сохраните результаты</p>
+        </div>
+    </div>
+
+    <footer>
+        by <a href="https://github.com/taffan" target="_blank">github.com/taffan</a>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/geocoder.js"></script>
+    <script src="js/route.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

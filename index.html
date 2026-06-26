@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Геокодер</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Геокодер</h1>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('load')" data-tip="Шаг 1: Загрузка файла"><span class="tab-num">1</span> 📁 Загрузка</button>
+            <button class="tab-btn" onclick="showTab('check')" data-tip="Шаг 2: Просмотр очищенных адресов"><span class="tab-num">2</span> 🔍 Проверка</button>
+            <button class="tab-btn" onclick="showTab('result')" data-tip="Шаг 3: Результаты геокодирования"><span class="tab-num">3</span> ✅ Результат</button>
+            <button class="tab-btn" onclick="showTab('route')" data-tip="Шаг 4: Расчёт маршрутов"><span class="tab-num">4</span> 🚗 Маршрут</button>
+        </div>
+        
+        <div class="card tab-content" id="tab-load">
+            <h3>📁 Загрузка адресов</h3>
+            <div class="form-group">
+                <label data-tip="Загрузите файл с названиями и адресами">Таблица (Название + Tab + Адрес) .txt, .xlsx, .csv:</label>
+                <input type="file" id="namesFileInput" accept=".txt,.xlsx,.csv" data-tip="Загрузите файл с названиями и адресами. Формат: название + Tab + адрес. Первая строка — заголовок">
+            </div>
+            <div id="namesFileInfo" style="margin-top:5px; color:#666;"></div>
+            
+            <div style="margin-top:20px; padding:15px; background:#f8f9fa; border-radius:8px;">
+                <h4 style="margin:0 0 10px 0;">📍 Расчёт расстояния от базовой точки</h4>
+                <div style="display:flex; gap:15px; flex-wrap:wrap; align-items:center;">
+                    <div style="flex:1; min-width:250px;">
+                        <label style="font-size:12px;" data-tip="Введите адрес базовой точки">Адрес базы:</label>
+                        <div style="display:flex; gap:5px;">
+                            <input type="text" id="baseAddress" placeholder="Адрес базы" style="flex:1; padding:8px;" data-tip="Введите адрес базовой точки">
+                            <button class="btn btn-secondary" onclick="fillBaseCoords()" style="padding:8px 12px;" data-tip="Найти координаты базовой точки">Заполнить</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:12px;" data-tip="Широта базовой точки">База lat:</label>
+                        <input type="number" id="baseLat" step="0.000001" value="" placeholder="lat" style="width:120px; padding:8px;" data-tip="Широта (latitude) базовой точки">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;" data-tip="Долгота базовой точки">База lon:</label>
+                        <input type="number" id="baseLon" step="0.000001" value="" placeholder="lon" style="width:120px; padding:8px;" data-tip="Долгота (longitude) базовой точки">
+                    </div>
+                    <div>
+                        <label style="font-size:12px;" data-tip="Коэффициент для расчёта реального расстояния (1.5 = +50%)">Коэф:</label>
+                        <input type="number" id="coef" value="1.5" step="0.1" style="width:70px; padding:8px;" data-tip="Умножитель расстояния. 1.5 добавляет 50% к прямому расстоянию">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card tab-content" id="tab-check" style="display:none">
+            <h3>🔍 Проверка очистки адресов</h3>
+            <p style="color:#666;" data-tip="Проверьте, как программа обработала ваши адреса">Исправленные адреса будут использованы для поиска координат.</p>
+            
+            <div class="filter-btns">
+                <button class="btn btn-secondary active" onclick="filterAddresses('all')" data-tip="Показать все адреса">Все (<span id="countAll">0</span>)</button>
+                <button class="btn btn-secondary" onclick="filterAddresses('changed')" data-tip="Показать только изменённые">Изменённые (<span id="countChanged">0</span>)</button>
+                <button class="btn btn-secondary" onclick="filterAddresses('unchanged')" data-tip="Показать только без изменений">Без изменений (<span id="countUnchanged">0</span>)</button>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px">#</th>
+                            <th style="width:50%">Оригинал</th>
+                            <th style="width:50%">Для поиска</th>
+                        </tr>
+                    </thead>
+                    <tbody id="previewTable"></tbody>
+                </table>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="startGeocoding()" data-tip="Запустить поиск координат для всех адресов">🚀 Начать геокодирование</button>
+            </div>
+        </div>
+        
+        <div class="card tab-content" id="tab-result" style="display:none">
+            <h3>✅ Результаты геокодирования</h3>
+            <div class="progress" data-tip="Прогресс геокодирования">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            <div class="stats">
+                <span class="stat" data-tip="Общее количество адресов">📊 Всего: <strong id="totalCount">0</strong></span>
+                <span class="stat stat-success" data-tip="Адреса, для которых найдены координаты">✅ Найдено: <strong id="foundCount">0</strong></span>
+                <span class="stat stat-danger" data-tip="Адреса, которые не удалось найти">❌ Не найдено: <strong id="notFoundCount">0</strong></span>
+            </div>
+            
+            <div class="filter-btns">
+                <button class="btn btn-secondary active" onclick="filterResults('all')" data-tip="Показать все результаты">Все (<span id="resCountAll">0</span>)</button>
+                <button class="btn btn-secondary" onclick="filterResults('found')" data-tip="Показать только найденные">Найдены (<span id="resCountFound">0</span>)</button>
+                <button class="btn btn-secondary" onclick="filterResults('notfound')" data-tip="Показать только ненайденные">Не найдены (<span id="resCountNotFound">0</span>)</button>
+            </div>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:40px">#</th>
+                            <th style="width:25%">Адрес</th>
+                            <th style="width:22%">Искался</th>
+                            <th style="width:18%">Координаты</th>
+                            <th style="width:70px">km</th>
+                            <th style="width:65px">Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultTable"></tbody>
+                </table>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-success" onclick="downloadResults()" data-tip="Сохранить результаты в Excel-файл">📥 Скачать Excel</button>
+                <button class="btn btn-secondary" onclick="downloadNotFound()" data-tip="Сохранить список ненайденных адресов">📥 Не найденные</button>
+                <label style="display:flex;align-items:center;gap:5px;" data-tip="Использовать названия вместо адресов в матрице">
+                    <input type="checkbox" id="matrixWithNames" checked>
+                    <span>С названиями</span>
+                </label>
+                <button class="btn btn-secondary" onclick="downloadDistanceMatrix()" data-tip="Сохранить матрицу расстояний">📐 Матрица</button>
+                <button class="btn btn-danger" id="stopBtn" onclick="stopGeocoding()" data-tip="Остановить геокодирование" disabled>⏹ Стоп</button>
+            </div>
+        </div>
+        
+        <div class="card tab-content" id="tab-route" style="display:none">
+            <h3>🚗 Расчёт маршрута</h3>
+            <p style="color:#666;background:#fff3cd;padding:15px;border-radius:8px;margin-bottom:20px;">
+                <b>⚠️ Перед расчётом маршрута:</b><br>
+                • Выполните геокодирование (шаг 2-3),<br>
+                • ИЛИ загрузите свою матрицу расстояний (.xlsx)
+            </p>
+            
+            <h4 data-tip="Загрузите готовую матрицу расстояний">📊 Матрица расстояний (.xlsx):</h4>
+            <input type="file" id="matrixFileInput" accept=".xlsx" style="margin-bottom:15px;" onchange="loadCustomMatrix(this)" data-tip="Загрузите матрицу расстояний. Первый столбец — названия объектов">
+            <div id="customMatrixInfo" style="color:#666;margin-bottom:10px;"></div>
+            
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+            
+            <h4>🔍 Быстрый поиск:</h4>
+            <div class="autocomplete-wrapper">
+                <input type="text" id="quickSearch" placeholder="Начните вводить название..." oninput="handleQuickSearch(this.value)" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:14px;">
+                <div id="autocompleteList" class="autocomplete-list"></div>
+            </div>
+            <button class="btn btn-secondary" onclick="addToRoute()" style="margin-top:10px;">Добавить в маршрут</button>
+            
+            <h4 style="margin-top:20px;">📝 Маршрут (один на строку):</h4>
+            <textarea id="routeInput" placeholder="Название объекта 1
+Название объекта 2
+Название объекта 3" style="width:100%;min-height:100px;padding:12px;border:1px solid #ddd;border-radius:8px;font-family:inherit;margin-bottom:15px;" data-tip="Введите названия объектов в том порядке, в каком хотите посетить. Одно название на строку"></textarea>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="calculateRoute()" data-tip="Рассчитать маршрут по введённым точкам">📍 Рассчитать</button>
+                <button class="btn btn-secondary" onclick="downloadRoute()" data-tip="Сохранить маршрут в Excel">📥 Сохранить</button>
+                <button class="btn btn-secondary" onclick="clearRoute()" data-tip="Очистить">Очистить</button>
+            </div>
+            
+            <div id="routeResult" style="margin-top:20px;"></div>
+        </div>
+    </div>
+
+    <div style="position:fixed;bottom:20px;right:20px;z-index:1000;">
+        <button class="tooltip-btn" id="tipBtn" onclick="toggleTips()" data-tip="Включить/выключить подсказки при наведении">?</button>
+    </div>
+
+    <footer>
+        by <a href="https://github.com/taffan" target="_blank">github.com/taffan</a>
+    </footer>
+
+    <div class="modal" id="helpModal">
+        <div class="modal-content">
+            <span class="modal-close" onclick="closeHelp()">&times;</span>
+            <h2>📖 Как пользоваться</h2>
+            
+            <h3>1. Загрузка данных</h3>
+            <p>Загрузите файл с названиями и адресами. Нажмите кнопку <b>?</b> внизу справа для подсказок.</p>
+            
+            <h3>2. Геокодирование</h3>
+            <p>Нажмите "🚀 Начать геокодирование" для поиска координат по адресам.</p>
+            
+            <h3>3. Результаты</h3>
+            <p>Сохраните результаты в Excel или рассчитайте маршрут.</p>
+            
+            <h3>4. Подсказки</h3>
+            <p>Нажмите кнопку <b>?</b> в правом нижнем углу для включения интерактивных подсказок. Наведите курсор на элемент для получения подсказки.</p>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/geocoder.js"></script>
+    <script src="js/route.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
